@@ -1,7 +1,10 @@
 package com.gumtree.techassignment.query.filehandling;
 
+import com.gumtree.techassignment.query.constants.ErrorCodes;
 import com.gumtree.techassignment.query.constants.Gender;
 import com.gumtree.techassignment.query.dto.Person;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.util.ResourceUtils;
 
 import java.io.BufferedReader;
@@ -16,19 +19,24 @@ import java.util.stream.Stream;
 
 public class PersonTextFileLoader extends TextFileLoader {
 
+    private static final Logger logger = LoggerFactory.getLogger(PersonTextFileLoader.class);
     private final Map<String, List<Integer>> index = new HashMap<>();
     private final Map<String, Long> genderCounter = new HashMap<>();
     private Person oldestPerson = null;
     private String fileName = null;
     private final DateFormat dateFormat = new SimpleDateFormat("dd/MM/yy", Locale.UK);
 
-    public PersonTextFileLoader() {}
+    public PersonTextFileLoader() {
+        logger.debug("Create");
+    }
     public PersonTextFileLoader(FileLoader pFileLoader, String fileName) throws IOException {
+        logger.debug("Read fileName and load indices");
+        dateFormat.setTimeZone(TimeZone.getTimeZone("GMT"));
         this.fileName = fileName;
         pFileLoader.accept(new FileSource() {
             @Override
             public void populateIndex() throws IOException {
-                int counter=1;
+                int counter=0;
 
                 //Used BufferedReader because if the AddressBook file grows larger (like 10GB) then it is best to not load the entire file in-memory avoiding Heap memory leaks
                 try(BufferedReader in = new BufferedReader(new FileReader(ResourceUtils.getFile(String.format("classpath:%s", fileName))))) {
@@ -44,15 +52,18 @@ public class PersonTextFileLoader extends TextFileLoader {
                             try {
                                 Date currentPersonDOB = dateFormat.parse(personDetails[2]);
                                 if (oldestPerson == null) {
-                                    oldestPerson = new Person(name[0], personDetails[0].substring(name[0].length()), Gender.getFromVal(personDetails[1].trim()), currentPersonDOB);
+                                    oldestPerson = new Person(name[0], personDetails[0].substring(name[0].length()).trim(), Gender.getFromVal(personDetails[1].trim()), currentPersonDOB);
                                 } else if(oldestPerson.getDateOfBirth().after(currentPersonDOB)){
-                                    oldestPerson = new Person(name[0], personDetails[0].substring(name[0].length()), Gender.getFromVal(personDetails[1].trim()), currentPersonDOB);
+                                    oldestPerson = new Person(name[0], personDetails[0].substring(name[0].length()).trim(), Gender.getFromVal(personDetails[1].trim()), currentPersonDOB);
                                 }
                             } catch (ParseException e) {
-                                //notify about this failure to support team with line number
+                                //notify about this failure to support team with line number either by sending async notification about the failure
+                                //OR based on the below logger setup an alert in the log aggregator (like splunk, cloudwatch etc)
+                                logger.error(String.format("%s: Error parsing addressbook at line number : %s", ErrorCodes.ADBOOK_INVALID_DATE, counter));
                             }
                         } else {
-                            //notify about this entry to support team with line number
+                            //notify about this entry to support team with line number same as above
+                            logger.error(String.format("%s: Error invalid entry in addressBook at line number: %s", ErrorCodes.ADBOOK_INVALID_ENTRY, counter));
                         }
                         counter++;
                     }
@@ -88,7 +99,7 @@ public class PersonTextFileLoader extends TextFileLoader {
             String[] personDetails = line.split(",");
             Date dob = dateFormat.parse(personDetails[2]);
             String name[] = personDetails[0].split("\\s+");
-            return new Person(name[0], personDetails[0].substring(name[0].length()), Gender.getFromVal(personDetails[1].trim()), dob);
+            return new Person(name[0], personDetails[0].substring(name[0].length()).trim(), Gender.getFromVal(personDetails[1].trim()), dob);
         }
         catch(IOException e){
             throw e;
