@@ -22,8 +22,7 @@ public class QueryService {
     public long ageComparison(AgeComparisonRequest inputRequest) throws IOException, ParseException {
         Person firstPerson = retrieveFromAddressBook(inputRequest.getSource());
         Person secondPerson = retrieveFromAddressBook(inputRequest.getTarget());
-        long differenceInDays = ChronoUnit.DAYS.between(secondPerson.getDateOfBirth().toInstant(), firstPerson.getDateOfBirth().toInstant());
-        return differenceInDays < 0 ? differenceInDays * -1 : differenceInDays;
+        return ChronoUnit.DAYS.between(firstPerson.getDateOfBirth().toInstant(), secondPerson.getDateOfBirth().toInstant());
     }
 
     public long getNumberOfPersonByGender(String value) {
